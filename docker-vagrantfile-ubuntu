@@ -1,0 +1,108 @@
+##
+#  from ubuntu 14.04 container first
+#  ref: https://docs.docker.com/engine/tutorials/dockerimages/
+##
+ 
+# pull ubuntu 14.04 and run it
+sudo docker pull ubuntu:14.04
+sudo docker run -t -i --expose 3306 --expose 3000 -p 3306:3306 -p 3000:3000 ubuntu:14.04 /bin/bash
+ 
+# container up, run in container below
+apt-get -y update
+ 
+apt-get install -y python-software-properties
+apt-get install -y software-properties-common
+# for make
+apt-get install -y build-essential
+# in case wget not installed
+apt-get install -y wget
+ 
+# install mysql
+apt-get install -y mysql-server mysql-client libmysqlclient-dev
+ 
+# start mysql
+/etc/init.d/mysql start
+ 
+# run mysql, change PASS to your password
+mysql -u root -pPASS
+ 
+CREATE DATABASE redmine CHARACTER SET utf8;
+# change redmine to your redmine DB user
+# change REDMINEPASS to your redmine DB user password
+CREATE USER 'redmine'@'localhost' IDENTIFIED BY 'REDMINEPASS';
+GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';
+quit
+ 
+ 
+##
+#  Install Rails
+##
+# Install ruby 2.1
+add-apt-repository -y ppa:brightbox/ruby-ng
+apt-get -y update
+apt-get install -y ruby2.1
+ 
+# Install ruby Dev-Kit
+apt-get install -y ruby2.1-dev
+ 
+# Install nodejs (javascript-runtime)
+apt-get install -y nodejs
+ 
+# ssl
+apt-get install -y libssl-dev
+# magick
+apt-get install -y imagemagick libmagickcore-dev libmagickwand-dev
+ 
+# Install Rails
+gem install rails --no-ri --no-rdoc -v "=4.2.5"
+gem install bundler
+gem install mysql2
+ 
+###
+# Get redmine and config
+###
+# create and enter folder
+mkdir -p /proj/redmine
+cd /proj/redmine
+ 
+# get redmine
+wget http://www.redmine.org/releases/redmine-3.2.0.tar.gz
+# extract
+tar -xvzf redmine-3.2.0.tar.gz
+# remove tar file
+rm redmine-3.2.0.tar.gz
+ 
+# create database.yml from example
+cp redmine-3.2.0/config/database.yml.example redmine-3.2.0/config/database.yml
+ 
+# install vim
+apt-get install vim
+ 
+# edit database.yml, modify username and password for db
+vim redmine-3.2.0/config/database.yml
+ 
+cd /proj/redmine/redmine-3.2.0
+# edit Gemfile, add
+# gem "thin"
+vim Gemfile
+# install
+bundle install --without development test
+ 
+###
+# One time configuration
+###
+RAILS_ENV=production bundle exec rake db:migrate
+bundle exec rake generate_secret_token
+RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
+mkdir -p tmp tmp/pdf public/plugin_assets
+ 
+##
+#  exit and push image
+##
+# exit container
+exit
+# get container id, 2ad82de0af61 here
+sudo docker ps -a
+# commit container
+sudo docker commit -m "redmine started" -a "benbai123" 2ad82de0af61 benbai123/redmine
+sudo docker push benbai123/redmine
